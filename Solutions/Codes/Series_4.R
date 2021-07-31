@@ -1,170 +1,95 @@
-p=2
-n=500
-g1<-function(x){2*x/(1+abs(x)^1.5)}
-g2<-function(x){x^3/abs(x)^1.5}
-g3<-function(x){x}
-x<-runif(n*p,min=-1,max=1)
-Z<-matrix(x,ncol=p)
-par(mfrow=c(1,3))
-Xg1<-g1(Z)
-Xg2<-g2(Z)
-Xg3<-g3(Z)
-plot(Xg1)
-plot(Xg2)#centered around zero
-plot(Xg3)#uniform
-sampleX<-function(n=500){
-x=runif(n*p,min=-1,max=1)
-Z<-matrix(x,ncol=p)
-Xg1<-g1(Z)
-return(Xg1)}
-f1dim<-function(x){ sin(8*x)/(1+(4*x)^2) }
-f<-function(X){
-  return(f1dim(X[,1]))
-}
-f(Xg1)
-library("kknn")
-sampleY<-function(X){ return(f(X)+rnorm(dim(X)[1],sd=0.3))}
-res=rep(0,1000)
-for(i in 1:1000){
-Xtrain<-sampleX(500)
-Ytrain<-sampleY(Xtrain)
-dfTrain=data.frame(y=Ytrain,x=Xtrain)
-Xtest<-sampleX(2000) 
-Ytest<-sampleY(Xtest)
-dfTest=data.frame(x=Xtest)
-fit.kknn <- kknn(y ~., dfTrain,dfTest,k=8)
-predTest=predict(fit.kknn)
-res[i] <- mean((predTest-Ytest)^2)
-}
-act=mean(res)
+#Question 1
+url <- "https://ww2.amstat.org/publications/jse/datasets/fruitfly.dat.txt"
+data <- read.table(url)
+data <- data[,c(-1,-6)] # remove id and sleep
+names(data) <- c("partners","type","longevity","thorax")
+pairs(data)
+#From the pairs plot we see that there is a relation between longevity and type.
+#Furthermore, thorax length is positively correlated with longevity.
+#The database is attached to the R search path. This means that the database is searched by R when evaluating a 
+#variable, so objects in the database can be accessed by simply giving their names.
+?attach
+attach(data)
+col.partn <- 1*(partners==0) + 2*(partners==1) + 3*(partners==8)
+pch.type <- 1*(type==0) + 2*(type==1) + 3*(type==9)
+#partners
+#type
 par(mfrow=c(1,1))
-hist(res)
-abline(v=act, col="red",lwd=2)
-#Validation
-sampleY<-function(X){ return(f(X)+rnorm(dim(X)[1],sd=0.3))}
-ValidationSet<-function(X,Y){
-  n<-length(Y)
-  s <- sample(1:n, size=n, replace=F)
-  folds <- cut(seq(1,n), breaks=2, labels=FALSE)
-  ind.test <- s[which(folds==1)]
-  dfTrain=data.frame(y=Y[ind.test],x=X[ind.test,])
-  dfTest=data.frame(x=X[-ind.test,])
-  fit.kknn <- kknn(y ~ ., dfTrain,dfTest,k=8)
-  predTest=predict(fit.kknn)
-  Ytest<-Y[-ind.test]
-  MSEEstimate=mean((predTest-Ytest)^2)
-  return(MSEEstimate)
-}
-X <- sampleX()
-Y <- sampleY(X)
-ValidationSet(X,Y)
-RepeatedValidationSet<-function(X,Y){
-  MSEEstimate <- replicate(10, ValidationSet(X,Y))
-  return(mean(MSEEstimate))
-}
-RepeatedValidationSet(X,Y)
-act
-#10-fold cross validation 
+plot(thorax, longevity, pch=pch.type, col=col.partn,
+     ylim=range(longevity),xlim=range(thorax))
+legend("topleft",c("1 pregnant","8 pregnant","1 virgin",
+                   "8 virgin","0 partners"),
+       pch=c(1,2,1,2,3),col=c(2,2,3,3,1))
+#We can see that larger fruitflies tend to live longer. 
+#Furthermore, comparing fruitflies with similar thorax value, 
+#fruitflies with 8 virgins tend to live shorter.
+par(mfrow=c(1,3))
+plot(thorax[partners==0],longevity[partners==0],pch=pch.type[partners==0],col=1,
+    main="0 partners",ylim=range(longevity),xlim=range(thorax),
+    xlab="thorax length", ylab="longevity")
+plot(thorax[partners==1],longevity[partners==1],
+     pch=pch.type[partners==1],col=2,main="1 partners",
+     ylim=range(longevity),xlim=range(thorax),
+     xlab="thorax length", ylab="longevity")
+legend("topleft",c("pregnant","virgin"),pch=c(1,2),col=2)
+plot(thorax[partners==8],longevity[partners==8],
+    pch=pch.type[partners==8],col=3,main="8 partners",
+    ylim=range(longevity),xlim=range(thorax),
+    xlab="thorax length", ylab="longevity")
+legend("topleft",c("pregnant","virgin"),pch=c(1,2),col=3)
+#t seems that male fruitflies with pregnant females tend to live longer 
+#than those with virgin females. This difference in lifespan seems to be 
+#larger when partners=8 compared to partners=1. Hence, there seems to be 
+#an interaction effect between type and partners in their effect on longevity.
+par(mfrow=c(1,1))
+dummy.1.p <- (partners==1)*(type==0)*1 
+dummy.1.v <- (partners==1)*(type==1)*1 
+dummy.8.p <- (partners==8)*(type==0)*1  
+dummy.8.v <- (partners==8)*(type==1)*1  
+dummy.0 <- (partners==0)
+boxplot(thorax[dummy.1.p==1],thorax[dummy.1.v==1],
+          thorax[dummy.8.p==1],thorax[dummy.8.v==1],
+          thorax[dummy.0==1],
+          main="Thorax length",
+          names=c("1p","8p","1v","8v","0"),col="grey")
+fitfull<-lm(thorax~dummy.1.p+dummy.1.v+dummy.8.p+dummy.8.v)
+fitintercept<-lm(thorax~1)
+anova(fitintercept,fitfull)
+#The test is not significant. This was to be expected since the assignments 
+#to the groups were random,
+#hence the distribution of thorax should be similar among the different groups.
+fit_e1 <- lm(longevity[partners==1] ~ factor(type[partners==1]))
+summary(fit_e1)
+fit_e2 <- lm((longevity)[partners==1] ~ thorax[partners==1] +
+               factor(type[partners==1]))
+summary(fit_e2)
+#We can see that type is much more significant in 
+#the second model which includes thorax. The t-value is 
+#obtained by dividing the point estimate by the estimate of the
+#standard error. Note that the point estimates of the coefficient of 
+#type are slightly different in the two models, but we will leave this 
+#aside, and focus on the standard errors of the estimate. 
+#These are 3.456 in the model with thorax and 4.326 in the model
+#without thorax. The ratio is 3.456/4.326=0.80. The smaller standard 
+#error in the model with thorax leads to a larger 
+#t-value and hence more significant results. 
+#Why is the standard error smaller in the model with thorax? 
+#The residual standard error is smaller in the model with thorax 
+#than in the model without thorax because thorax explains a significant
+#amount of the variation in longevity. Moreover, thorax is not much correlated with type,
+#so that we don’t have to worry about large variance inflation factors.
+partners.f <- as.factor(partners)
+type.f <- as.factor(type)
+fit_f1 <- lm(longevity ~ thorax + partners.f + type.f + partners.f*type.f) 
+summary(fit_f1)
+#We only have 5 different groups of male fruitflies but 
+#there are 9 different combinations of the two three-level 
+#categorical predictors type and partners. 
+#The combinations (1,9), (8,9), (0,0) and (0,1) for (partners,type)
+#do not appear in the dataset because they do not make sense.
+#This is why we R reports ”Coefficients: (4 not defined because of singularities)”.
+#We need to do the analysis more carefully, see the next subquestion.
+fit_gFull <- lm((longevity) ~ thorax + dummy.1.p + dummy.1.v + dummy.8.p + dummy.8.v)
+summary(fit_gFull)
 
-tencv<-function(X,Y){
-  tencv<-rep(0,10)
-  n<-length(Y)
-  s <- sample(1:n, size=n, replace=F)
-  folds <- cut(seq(1,n), breaks=10, labels=FALSE)
-  for(i in 1:10 ){
-  ind.test <- s[which(folds==i)]
-  dfTrain=data.frame(y=Y[-ind.test],x=X[-ind.test,])
-  dfTest=data.frame(x=X[ind.test,])
-  fit.kknn <- kknn(y ~ ., dfTrain,dfTest,k=8)
-  predTest=predict(fit.kknn)
-  Ytest<-Y[ind.test]
-  MSEEstimate=mean((predTest-Ytest)^2)
-  tencv[i]=MSEEstimate
-  }
-  return(mean(tencv))}
-tencv(X,Y)
-RepeatedTenFoldCV<-function(X,Y){
-  MSEEstimate <- replicate(10, tencv(X,Y))
-  return(mean(MSEEstimate))
-}
-RepeatedTenFoldCV(X,Y)
-LOOCV<-function(X,Y){
-  n <- length(Y)
-  MSEEstimate <- numeric(n)
-  for (i in 1:n) {
-    dfTrain=data.frame(y=Y[-i],x=X[-i,])
-    dfTest=data.frame(x=matrix(X[i,],nrow=1))
-    fit.kknn <- kknn(y ~ ., dfTrain,dfTest,k=8)
-    predTest=predict(fit.kknn)
-    Ytest<-Y[i]
-    MSEEstimate[i]<-(predTest-Ytest)^2
-  }
-  return(mean(MSEEstimate))
-}
-LOOCV(X,Y)
-act
-EvaluateOnSimulation<-function(estimationFunction, iterations=200){
-  result<-numeric(iterations)
-  for (i in 1:iterations) {
-    X<-sampleX()
-    Y<-sampleY(X)
-    result[i]= estimationFunction(X,Y)
-  }
-  return(result)
-}
-EstimatesVS <- EvaluateOnSimulation(ValidationSet)
-EstimatesrepVS <- EvaluateOnSimulation(RepeatedValidationSet)
-Estimatestencv <- EvaluateOnSimulation(tencv)
-Estimatesreptencv <- EvaluateOnSimulation(RepeatedTenFoldCV)
-Estimatesloocv <- EvaluateOnSimulation(LOOCV)
-Estimates <- cbind(EstimatesVS,EstimatesrepVS,Estimatestencv,Estimatesreptencv,Estimatesloocv ) #results from the 5 CV methods
-boxplot(Estimates)
-abline(h=act,col="red")
-bias_vs=mean(EstimatesVS)-act
-bias_vs
-var_vs=var(EstimatesVS)
-var_vs
-bias_vsrep=mean(EstimatesrepVS)-act
-bias_vsrep
-var_vsrep=var(EstimatesrepVS)
-var_vsrep
-bias_tencv=mean(Estimatestencv)-act
-bias_tencv
-var_tencv=var(Estimatestencv)
-var_tencv
-bias_reptencv=mean(Estimatesreptencv)-act
-bias_reptencv
-var_reptencv=var(Estimatesreptencv)
-var_reptencv
-bias_loocv=mean(Estimatesloocv)-act
-bias_loocv
-var_loocv=var(Estimatesloocv)
-var_loocv
-biases=c(bias_vs,bias_vsrep,bias_tencv,bias_reptencv,bias_loocv)
-caption<-c("Val. Set", "Repeated Val. Set", "10 Fold CV", "Repeated 10 Fold CV","Leave-one-out")
 
-names(biases)=caption
-barplot(biases, main="Bias for estimation of expected test MSE")
-variances<-c(var_vs,var_vsrep,var_tencv,var_reptencv,var_loocv)
-names(variances)=caption
-barplot(variances, main="Variance for estimation of expected test MSE")
-msemse<-biases^2+variances
-names(msemse)=caption
-barplot(msemse, main="MSE for estimation of expected test MSE")
-tencv_mod<-function(X,Y){
-  tencv<-rep(0,10)
-  n<-length(Y)
-  s <- sample(1:n, size=n, replace=F)
-  folds <- cut(seq(1,n), breaks=10, labels=FALSE)
-  for(i in 1:10 ){
-    ind.test <- s[which(folds==i)]
-    dfTrain=data.frame(y=Y[-ind.test],x=X[-ind.test,])
-    dfTest=data.frame(x=X[ind.test,])
-    fit.kknn <- kknn(y ~ ., dfTrain,dfTest,k=8)
-    predTest=predict(fit.kknn)
-    Ytest<-Y[ind.test]
-    MSEEstimate=mean((predTest-Ytest)^2)
-    tencv[i]=MSEEstimate
-  }
-  return(return(var(tencv)/10))}
-tencv_mod(X,Y)
