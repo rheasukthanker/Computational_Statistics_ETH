@@ -1,3 +1,3 @@
 # Computational_Statistics_ETH
 
-Solutions to exercises of the Computer Statistics course at ETH Zurich 
+This repo mainly contains solutions to exercises to the Computer Statistics course at ETH Zurich. Some R codes to illustrate concepts in computational statistics better are also presented 
